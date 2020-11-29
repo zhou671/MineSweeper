@@ -22,9 +22,30 @@ class Model(tf.keras.Model):
 
         self.optimizer = tf.keras.optimizers.Adam()
 
-        self.lifting = tf.keras.layers.Dense(32)
-        self.res1 = Residual(64)
-        self.res2 = Residual(128)
+        self.lifting = tf.keras.layers.Dense(64)
+        self.res1 = Residual(128)
+        self.res2 = Residual(256)
         self.dense = tf.keras.layers.Dense(width * height)
+        
 
-    def call(self, ):
+    def call(self, input, encoded_grids): 
+        """
+        input: a one-hot vector with depth of 10
+        """
+        features = self.lifting(input) + encoded_grids
+        # features.shape = [batch_size, 6, 6, 64]
+        features = self.res1(features)
+        # features.shape = [batch_size, 6, 6, 128]
+        features = tf.nn.max_pool(features, (2, 2), (2, 2), "VALID")
+        # features.shape = [batch_size, 3, 3, 128]
+        features = self.res2(features)
+        # features.shape = [batch_size, 3, 3, 256]
+        features = tf.nn.max_pool(features, (3, 3), (1, 1), "VALID")
+        # features.shape = [batch_size, 1, 1, 256]
+        features = tf.reshape(features, (-1, 256))
+        # features.shape = [batch_size, 256]
+        features = self.dense(features)
+        # features.shape = [batch_size, 36]
+        probs = tf.nn.softmax(featrues)
+
+        return probs

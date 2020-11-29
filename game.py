@@ -65,6 +65,9 @@ class Game:
                         if self.mines[r][c] == 1:
                             self.grid[i][j] += 1
 
+                    if self.grid[i][j] == 0:
+                        self.grid[i][j] = 9
+
     def reveal(self, r, c):
         """
         """
