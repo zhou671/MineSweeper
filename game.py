@@ -9,6 +9,7 @@ class Game:
         """
         self.r = r
         self.c = c
+        self.random_assign = random_assign
         if random_assign:
             self.num_of_mines = np.random.randint(math.sqrt(r * c), math.floor(r * c / 2) + 1)
         else:
@@ -112,11 +113,11 @@ class Game:
         pass
 
     def reset(self):
-        if random_assign:
-            self.num_of_mines = np.random.randint(math.sqrt(r * c), math.floor(r * c / 2) + 1, 1)
+        if self.random_assign:
+            self.num_of_mines = np.random.randint(math.sqrt(self.r * self.c), math.floor(self.r * self.c / 2) + 1, 1)
         
         self.state_mask = np.zeros((self.r, self.c), dtype = int)
-        self.num_uncover = r * c
+        self.num_uncover = self.r * self.c
         self.mines = np.zeros((self.r, self.c), dtype = int) 
         self.grid = np.zeros((self.r, self.c), dtype = int)
 
