@@ -111,9 +111,22 @@ class Game:
 
         return state, ans, self.num_of_mines
 
-
     def action(self, r, c):
-        pass
+        if self.mines[r][c] == 1:
+            state = self.state_mask * self.grid
+            return False, None, True
+
+        if self.state_mask[r][c] == 1:
+            state = self.state_mask * self.grid
+            return False, None, True
+
+        self.reveal(r, c)
+
+        if self.num_uncover == self.num_of_mines: #optimize it!
+            return True, None, True
+        else:
+            state = self.state_mask * self.grid
+            return True, state, False
 
     def reset(self):
         if self.random_assign:

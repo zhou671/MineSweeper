@@ -2,78 +2,113 @@ import numpy as np
 import math
 import tensorflow as tf
 from model import Model
+from game import Game
 
 
-def train(model, train_state, train_mines, train_answer):
-    epoch_num = 5
+def train(model, train_state, train_mines, train_answer, first):
+    epoch_num = 3
+    train_state = tf.Variable(train_state)
+    train_mines = tf.Variable(train_mines)
+    train_answer = tf.Variable(train_answer)
+    first = tf.Variable(first)
+    size = train_state.shape[0]
     for epoch in range(epoch_num):
-        shuffle_index = np.arange(0, len(train_state))
+        shuffle_index = np.arange(0, train_state.shape[0])
         np.random.shuffle(shuffle_index)
-        train_state, train_mines, train_answer = train_state[shuffle_index], train_mines[shuffle_index], train_answer[
-            shuffle_index]
-        batch_size = 32
-        for i in range(0, len(train_state) // batch_size):
-            sample_state, sample_mines, sample_answer = train_state[
-                                                        i * batch_size: i * batch_size + batch_size], \
-                                                        train_mines[
-                                                        i * batch_size: i * batch_size + batch_size], train_answer[
-                                                                                                      i * batch_size: i * batch_size + batch_size]
-            sample_state = tf.convert_to_tensor(sample_state)
-            sample_mines = tf.convert_to_tensor(sample_mines)
-            sample_answer = tf.convert_to_tensor(sample_answer)
+        train_state = tf.gather(train_state, shuffle_index)
+        train_mines = tf.gather(train_mines, shuffle_index)
+        train_answer = tf.gather(train_answer, shuffle_index)
+        first = tf.gather(first, shuffle_index)
+        #train_state, train_mines, train_answer = train_state[shuffle_index], train_mines[shuffle_index], train_answer[shuffle_index]
+        batch_size = 256
+        iteration = 0
+        for i in range(0, size, batch_size):
+            end = min(i + batch_size, size)
+            sample_state = train_state[i: end]
+            sample_mines = train_mines[i: end]
+            sample_answer = train_answer[i: end]
+            sample_first = first[i: end]
+            #sample_state, sample_mines, sample_answer = train_state[i * batch_size: i * batch_size + batch_size], train_mines[i * batch_size: i * batch_size + batch_size], train_answer[i * batch_size: i * batch_size + batch_size]
+
             grids = sample_mines / 36
             grids = tf.reshape(grids, shape=(grids.shape[0], 1, 1, 1))
             grids = tf.repeat(grids, 6, axis=1)
             grids = tf.repeat(grids, 6, axis=2)
-            extra_features = tf.expand_dims(tf.argmax(sample_state, axis=3), axis=3)
-            extra_features = tf.cast(extra_features, tf.float32)
+            # extra_features = tf.expand_dims(tf.argmax(sample_state, axis=3), axis=3)
+            # extra_features = tf.cast(extra_features, tf.float32)
             grids = tf.cast(grids, tf.float32)
-            extra_features = tf.concat((grids, extra_features), axis=3)
-            extra_features = tf.repeat(extra_features, repeats=32, axis=3)
+            # extra_features = tf.concat((grids, extra_features), axis=3)
+            #extra_features = tf.repeat(extra_features, repeats=32, axis=3)
+
+
+            extra_features = tf.concat((grids, sample_first), axis = -1)
+
             with tf.GradientTape() as tape:
                 output = model(sample_state, extra_features)
                 loss, _, accuracy = model.loss(output, sample_answer)
                 loss = tf.reduce_mean(loss)
-                if i > 0 and i % 20 == 0:
-                    print("Epoch: {} Iteration: {}/{} Loss: {} accuracy: {}".format(epoch, i,
-                                                                                    len(train_state) // batch_size,
+                if i > 0 and i % (20 * 256) == 0:
+                    print("Epoch: {} Iteration: {}/{} Loss: {} accuracy: {}".format(epoch, iteration,
+                                                                                    size // batch_size,
                                                                                     loss, accuracy))
             gradients = tape.gradient(loss, model.trainable_variables)
             model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+            iteration += 1
 
+def test(model):
+    g = Game(num_of_mines = 6, random_assign = False)
+    wins = 0
+    num_of_mines = 6
+    grids = float(num_of_mines) / 36
+    grids = tf.reshape(grids, shape=(1, 1, 1, 1))
+    grids = tf.repeat(grids, 6, axis=1)
+    grids = tf.repeat(grids, 6, axis=2)
+    for i in range(10000):
+        flag = True
+        num_of_mines = 6
 
-def test(model, test_state, test_mines, test_answer):
-    shuffle_index = np.arange(0, len(test_state))
-    np.random.shuffle(shuffle_index)
-    train_state, train_mines, train_answer = test_state[shuffle_index], test_mines[shuffle_index], test_answer[
-        shuffle_index]
-    batch_size = 32
-    total_ac = []
-    for i in range(0, len(train_state) // batch_size):
-        sample_state, sample_mines, sample_answer = train_state[
-                                                    i * batch_size: i * batch_size + batch_size], train_mines[
-                                                                                                  i * batch_size: i * batch_size + batch_size], train_answer[
-                                                                                                                                                i * batch_size: i * batch_size + batch_size]
-        sample_state = tf.convert_to_tensor(sample_state)
-        sample_mines = tf.convert_to_tensor(sample_mines)
-        sample_answer = tf.convert_to_tensor(sample_answer)
-        grids = sample_mines / 36
-        grids = tf.reshape(grids, shape=(grids.shape[0], 1, 1, 1))
-        grids = tf.repeat(grids, 6, axis=1)
-        grids = tf.repeat(grids, 6, axis=2)
-        extra_features = tf.expand_dims(tf.argmax(sample_state, axis=3), axis=3)
-        extra_features = tf.cast(extra_features, tf.float32)
-        grids = tf.cast(grids, tf.float32)
-        extra_features = tf.concat((grids, extra_features), axis=3)
-        extra_features = tf.repeat(extra_features, repeats=32, axis=3)
-        output = model(sample_state, extra_features)
-        output_argmax = tf.argmax(output, axis=1)
-        sample_answer = tf.reshape(sample_answer, shape=(sample_answer.shape[0], -1))
-        pre_label = tf.gather(sample_answer, output_argmax, axis=1)
-        ac = tf.reduce_mean(tf.cast(pre_label, tf.float32))
-        total_ac.append(ac)
-    print("Total accuracy: {}".format(tf.reduce_mean(total_ac)))
-    return tf.reduce_mean(total_ac)
+        state, _, num_of_mines = g.action_random_true()
+        state = tf.Variable(state)
+        state = tf.expand_dims(state, axis = 0)
+
+        first = state % 9 
+        first = tf.cast(first, tf.float32)
+        first = tf.expand_dims(first, axis = -1)
+
+        state = tf.one_hot(state, 10)
+
+        extra_features = tf.concat((grids, first), axis = -1)
+
+        logits = model(state, extra_features)
+
+        output_argmax = tf.argmax(logits, axis=1)
+
+        r = math.floor(output_argmax[0] / 6)
+        c = int(output_argmax[0] % 6)
+
+        while flag:
+            success, state, end_of_game = g.action(r, c)
+            if not success:
+                break
+            elif success and end_of_game:
+                wins += 1
+                break
+            else:
+                state = tf.Variable(state)
+                state = tf.expand_dims(state, axis = 0)
+                first = state % 9 
+                first = tf.cast(first, tf.float32)
+                first = tf.expand_dims(first, axis = -1)
+                state = tf.one_hot(state, 10)
+                extra_features = tf.concat((grids, first), axis = -1)
+                logits = model(state, extra_features)
+                output_argmax = tf.argmax(logits, axis=1)
+                r = math.floor(output_argmax[0] / 6)
+                c = int(output_argmax[0] % 6) 
+                
+        g.reset() 
+
+    return float(wins) / 10000.0
 
 
 def main():
@@ -84,24 +119,31 @@ def main():
     nums_of_mines = [float(m[2]) for m in loaded]
     states = np.array(states)
     answers = np.array(answers)
+    flip = np.ones(answers.shape)
+    answers = flip - answers
     nums_of_mines = np.array(nums_of_mines)
-    states_new = np.zeros((states.size, 10))
-    states_flatten = states.flatten()
-    for i, j in enumerate(states_flatten):
-        states_new[i][j] = 1
-    states = np.reshape(states_new, newshape=(states.shape[0], states.shape[1], states.shape[2], -1))
-    training_data = len(states) * 0.9
-    training_data = int(training_data)
-    train_state = states[:training_data]
-    test_state = states[training_data:]
-    train_answer = answers[:training_data]
-    test_answer = answers[training_data:]
-    train_mines = nums_of_mines[:training_data]
-    test_mines = nums_of_mines[training_data:]
+    first = states % 9
+    first = tf.cast(first, tf.float32)
+    first = tf.expand_dims(first, axis = -1)
+    states = tf.one_hot(states, 10)
+    # states_new = np.zeros((states.size, 10))
+    # states_flatten = states.flatten()
+    # for i, j in enumerate(states_flatten):
+    #     states_new[i][j] = 1
+    # states = np.reshape(states_new, newshape=(states.shape[0], states.shape[1], states.shape[2], -1))
+    # training_data = len(states) * 0.9
+    # training_data = int(training_data)
+    # train_state = states[:training_data]
+    # test_state = states[training_data:]
+    # train_answer = answers[:training_data]
+    # test_answer = answers[training_data:]
+    # train_mines = nums_of_mines[:training_data]
+    # test_mines = nums_of_mines[training_data:]
     model = Model(width=6, height=6)
-    train(model=model, train_state=train_state, train_answer=train_answer, train_mines=train_mines)
-    test(model=model, test_state=test_state, test_answer=test_answer, test_mines=test_mines)
+    train(model=model, train_state=states, train_answer=answers, train_mines=nums_of_mines, first = first)
+    acc = test(model)
 
+    print(acc)
 
 if __name__ == '__main__':
     main()

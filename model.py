@@ -11,9 +11,10 @@ class Residual(tf.keras.Model):
         self.norm2 = tf.keras.layers.BatchNormalization()
 
     def call(self, x):
+        repeat = tf.tile(x, [1,1,1,2])
         fx = tf.nn.relu(self.norm1(self.conv1(x)))
         fx = self.norm2(self.conv2(fx))
-        return tf.nn.relu(fx + x)
+        return tf.nn.relu(fx + repeat)
 
 
 class Model(tf.keras.Model):
@@ -26,43 +27,41 @@ class Model(tf.keras.Model):
         self.optimizer = tf.keras.optimizers.Adam(lr=0.001)
 
         self.lifting = tf.keras.layers.Dense(64)
-        self.dense128 = tf.keras.layers.Dense(128)
-        self.dense256 = tf.keras.layers.Dense(256)
 
         self.res1 = Residual(128)
         self.res2 = Residual(256)
-        self.dense = tf.keras.Sequential([
-            tf.keras.layers.Dense(512),
-            tf.keras.layers.ReLU(),
-            tf.keras.layers.Dense(512),
-            tf.keras.layers.ReLU(),
-            tf.keras.layers.Dense(512),
-            tf.keras.layers.ReLU(),
-            tf.keras.layers.Dense(width * height),
-            tf.keras.layers.ReLU(),
-        ])
-        # self.dense = tf.keras.layers.Dense(width * height)
+        self.dense = tf.keras.layers.Dense(width * height)
 
     def call(self, input, encoded_grids):
         """
         input: a one-hot vector with depth of 10
         """
+        #print(input.shape)
+        #print(encoded_grids.shape)
+        encoded_grids = tf.pad(encoded_grids, [[0,0],[0,0],[0,0],[0,62]])
         features = self.lifting(input) + encoded_grids
+        #print(features.shape)
         # features.shape = [batch_size, 6, 6, 64]
-        features = self.dense128(features)
+        #features = self.dense128(features)
         features = self.res1(features)
+        #print(features.shape)
         # features.shape = [batch_size, 6, 6, 128]
         features = tf.nn.max_pool(features, (2, 2), (2, 2), "VALID")
+        #print(features.shape)
         # features.shape = [batch_size, 3, 3, 128]
-        features = self.dense256(features)
+        #features = self.dense256(features)
         features = self.res2(features)
+        #print(features.shape)
         # features.shape = [batch_size, 3, 3, 256]
         features = tf.nn.max_pool(features, (3, 3), (1, 1), "VALID")
+        #print(features.shape)
         # features.shape = [batch_size, 1, 1, 256]
         features = tf.reshape(features, (-1, 256))
+        #print(features.shape)
         # features.shape = [batch_size, 256]
         features = self.dense(features)
         # features.shape = [batch_size, 36]
+        #print(features.shape)
         return features
 
     def loss(self, probs, answer):
@@ -70,6 +69,10 @@ class Model(tf.keras.Model):
         labels = tf.cast(labels, tf.float32)
         accuracy = tf.reduce_mean(tf.cast((probs > 0) == tf.cast(labels, tf.bool), tf.float32))
         output_argmax = tf.argmax(probs, axis=1)
-        pre_label = tf.gather(labels, output_argmax, axis=1)
+        pre_label = tf.gather(labels, output_argmax, axis = 1, batch_dims = 1)
         ac = tf.reduce_mean(tf.cast(pre_label, tf.float32))
+        summation = tf.reduce_sum(labels,axis = 1)
+        summation = tf.expand_dims(summation, 1)
+        summation = tf.tile(summation, [1, self.height * self.width])
+        labels = tf.math.divide(labels, summation)
         return tf.nn.sigmoid_cross_entropy_with_logits(labels, probs), accuracy, ac
