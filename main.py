@@ -86,8 +86,14 @@ def test(model):
         r = math.floor(output_argmax[0] / 6)
         c = int(output_argmax[0] % 6)
 
+        times = 0
+
         while flag:
             success, state, end_of_game = g.action(r, c)
+            times += 1
+            if times > 36:
+                print("problems in test")
+                print(state)
             if not success:
                 break
             elif success and end_of_game:

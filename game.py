@@ -82,7 +82,7 @@ class Game:
                 self.state_mask[r][c] = 1
                 self.num_uncover -= 1
 
-                if self.grid[r][c] == 0:
+                if self.grid[r][c] == 9:
                     ns = self.getNeighbor(r, c)
                     for nr, nc in ns:
                         stk.append((nr, nc))
