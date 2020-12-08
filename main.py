@@ -3,6 +3,10 @@ import math
 import tensorflow as tf
 from model import Model
 from game import Game
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
+
 
 
 def train(model, train_state, train_mines, train_answer, first):
@@ -12,6 +16,10 @@ def train(model, train_state, train_mines, train_answer, first):
     train_answer = tf.Variable(train_answer)
     first = tf.Variable(first)
     size = train_state.shape[0]
+
+    final_loss=[]
+    final_accuracy=[]
+
     for epoch in range(epoch_num):
         shuffle_index = np.arange(0, train_state.shape[0])
         np.random.shuffle(shuffle_index)
@@ -47,6 +55,9 @@ def train(model, train_state, train_mines, train_answer, first):
                 output = model(sample_state, extra_features)
                 loss, _, accuracy = model.loss(output, sample_answer)
                 loss = tf.reduce_mean(loss)
+
+                final_loss.append(loss)
+                final_accuracy.append(accuracy)
                 if i > 0 and i % (20 * 256) == 0:
                     print("Epoch: {} Iteration: {}/{} Loss: {} accuracy: {}".format(epoch, iteration,
                                                                                     size // batch_size,
@@ -54,6 +65,24 @@ def train(model, train_state, train_mines, train_answer, first):
             gradients = tape.gradient(loss, model.trainable_variables)
             model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
             iteration += 1
+    visualize_loss(final_loss)
+    visualize_accuracy(final_accuracy)
+
+def visualize_loss(losses): 
+    x = [i for i in range(len(losses))]
+    plt.plot(x, losses)
+    plt.title('Loss per Iteration')
+    plt.xlabel('Iteration')
+    plt.ylabel('Loss')
+    plt.savefig("Loss.png")
+
+def visualize_accuracy(accuracies): 
+    x = [i for i in range(len(accuracies))]
+    plt.plot(x, accuracies)
+    plt.title('Accuracy per Iteration')
+    plt.xlabel('Iteration')
+    plt.ylabel('Accuracy')
+    plt.savefig("Accuracy.png")
 
 def test(model):
     g = Game(num_of_mines = 6, random_assign = False)
@@ -68,6 +97,17 @@ def test(model):
         num_of_mines = 6
 
         state, _, num_of_mines = g.action_random_true()
+
+        test_v = 0
+        while(state is None):
+            g.reset()
+            state, _, num_of_mines = g.action_random_true()
+            if(test_v > 100):
+                print("there are error")
+                break
+            test_v += 1
+        
+
         state = tf.Variable(state)
         state = tf.expand_dims(state, axis = 0)
 
@@ -94,6 +134,7 @@ def test(model):
             if times > 36:
                 print("problems in test")
                 print(state)
+                break
             if not success:
                 break
             elif success and end_of_game:
