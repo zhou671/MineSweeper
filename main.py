@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 
 def train(model, train_state, train_mines, train_answer, first):
-    epoch_num = 3
+    epoch_num = 5
     train_state = tf.Variable(train_state)
     train_mines = tf.Variable(train_mines)
     train_answer = tf.Variable(train_answer)
