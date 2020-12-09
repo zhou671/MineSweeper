@@ -6,18 +6,18 @@ from game import Game
 def main(): 
     model = Game()
     mylist = []
-    num = 10000
+    num = 1000000
     i = 0
     n_game = 1
-    random_array = [3,4,5,6,7]
-    r_a = np.random.choice(random_array, 1, p=[0.15, 0.15, 0.4, 0.15, 0.15])
+    random_array = [2,3,4]
+    r_a = np.random.choice(random_array, 1, p=[0.30, 0.40, 0.30])
     num_random = r_a[0]
     list_element = []
     while(i < num):
         a = model.action_random_true()
         if(a[0] is None and a[1] is None):
             model.reset()
-            r_a = np.random.choice(random_array, 1, p=[0.15, 0.15, 0.4, 0.15, 0.15])
+            r_a = np.random.choice(random_array, 1, p=[0.30, 0.40, 0.30])
             num_random = r_a[0]
             n_game+=1
             if(num_random >= num - i):
@@ -28,8 +28,11 @@ def main():
                 # print("list_element: ", list_element[:(num - i)])
                 mylist.extend(list_element[:(num - i)])
             else:
-                a2 = random.sample(list_element, num_random)
-                mylist.extend(a2)
+                if(len(list_element) < num_random):
+                    mylist.extend(list_element)
+                else:
+                    a2 = random.sample(list_element, num_random)
+                    mylist.extend(a2)
                 list_element = []
             i = len(mylist)
         else:
